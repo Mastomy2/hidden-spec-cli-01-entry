@@ -602,16 +602,17 @@ function v4aEdits(lines: string[], strict: boolean): Edit[] {
     if (line.startsWith('*** Add File: ')) {
       const p = line.slice('*** Add File: '.length).trim();
       const ls: string[] = [];
+      const lsBlank: boolean[] = [];
       i++;
       while (i < last) {
         const l = lines[i]!;
         if (isSectionStart(l)) break;
-        if (l.startsWith('+')) ls.push(l.slice(1));
-        else if (l === '') ls.push('');
+        if (l.startsWith('+')) { ls.push(l.slice(1)); lsBlank.push(false); }
+        else if (l === '') { ls.push(''); lsBlank.push(true); }
         else throw new Exit2(`error: parse ${i + 1}`);
         i++;
       }
-      while (ls.length > 0 && ls[ls.length - 1] === '') ls.pop();
+      while (ls.length > 0 && ls[ls.length - 1] === '' && lsBlank[lsBlank.length - 1]) { ls.pop(); lsBlank.pop(); }
       edits.push(v4aAddEdit(p, ls));
       continue;
     }
@@ -659,6 +660,12 @@ function v4aEdits(lines: string[], strict: boolean): Edit[] {
           cur = { anchor: anchorText === '' ? null : anchorText, entries: [], eof: false };
           i++;
           continue;
+        }
+        if (cur === null && chunks.length > 0) {
+          // Only reachable after a chunk was closed by *** End of File:
+          // a body line is not the start of a new chunk (SPEC §8).
+          if (l === '') { i++; continue; }
+          if (l[0] === ' ' || l[0] === '-' || l[0] === '+') throw new Exit2(`error: parse ${ln}`);
         }
         if (l === '' || l[0] === ' ' || l[0] === '-' || l[0] === '+') {
           if (cur === null) cur = { anchor: null, entries: [], eof: false };
